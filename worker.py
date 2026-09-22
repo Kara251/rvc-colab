@@ -181,9 +181,9 @@ def train_one(m):
              "--embedder-model", emb, "--gpu", "0"],
             [sys.executable, "core.py", "train", "--model-name", name,
              "--save-every-epoch", str(m.get("save_every_epoch", 10)),
-             "--save-only-latest", "True", "--total-epoch", str(target),
+             "--save-only-latest", "--total-epoch", str(target),
              "--sample-rate", str(sr), "--batch-size", str(bs),
-             "--gpu", "0", "--pretrained", "True", "--save-every-weights", "True"],
+             "--gpu", "0", "--pretrained", "--save-every-weights"],
         ]
         for cmd in steps:
             if sh(cmd).returncode != 0:
