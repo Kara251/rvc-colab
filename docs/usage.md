@@ -7,16 +7,16 @@
    excluded; edit `models.yaml` to drop or retune models.
 2. `python tools/prepare_datasets.py` — writes `datasets/<Model>.zip`
    (flat ogg bundles, stored uncompressed).
-3. On Google Drive create `RVC-Train/` and upload:
-   - `datasets/` — every zip from `AI-Models/datasets/` (~1.4 GB)
-   - `models.yaml`
-   - `worker.py`
+3. On Google Drive create `RVC-Train/datasets/` and upload every zip from
+   `AI-Models/datasets/` into it (~1.4 GB).
+4. Push this repo to GitHub (`github.com/Kara251/rvc-colab`).
 
 ## Running
 
-Upload `notebook/train.ipynb` in Colab (or open it from GitHub later), pick a
-T4 GPU runtime, run the single cell. It mounts Drive (browser approval, once
-per session) then runs `worker.py`, which:
+Open `notebook/train.ipynb` in Colab — upload it once, or use the GitHub URL
+`colab.research.google.com/github/Kara251/rvc-colab/blob/main/notebook/train.ipynb`.
+Pick a T4 GPU runtime, run the single cell. It mounts Drive (browser approval,
+once per session), clones this repo, then runs `worker.py`, which:
 
 - installs Applio (pinned commit) + pretrained weights once per session
 - loops `models.yaml`: unzip dataset -> preprocess -> extract -> train

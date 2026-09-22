@@ -20,10 +20,14 @@ it and re-run the cell after a session dies and training resumes from Drive.
 
 1. `python tools/gen_manifest.py` and `python tools/prepare_datasets.py` (done;
    outputs in `models.yaml` and `AI-Models/datasets/`)
-2. On Drive create `RVC-Train/`; upload `datasets/` (all zips), `models.yaml`,
-   and `worker.py` into it
-3. Upload `notebook/train.ipynb` in Colab, switch runtime to T4 GPU, run the cell
-4. Session dies -> reopen notebook, run the cell again. Done models are skipped.
+2. On Drive create `RVC-Train/datasets/` and upload every zip from
+   `AI-Models/datasets/` into it (~1.4 GB)
+3. Open `notebook/train.ipynb` in Colab — either upload it once, or after this
+   repo is pushed open it directly via
+   `colab.research.google.com/github/Kara251/rvc-colab/blob/main/notebook/train.ipynb`
+4. Switch runtime to T4 GPU, run the cell. It mounts Drive (one approval per
+   session), clones this repo, and runs `worker.py`.
+5. Session dies -> reopen notebook, run the cell again. Done models are skipped.
 
 Finished weights land in `RVC-Train/exported/<model>/`; download that folder,
 then `python tools/pull_models.py --src <downloaded exported dir>` copies them

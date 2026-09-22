@@ -30,7 +30,7 @@ SYNC_SEC = 60
 DATASETS = os.path.join(DRIVE_ROOT, "datasets")
 LOGS_DRIVE = os.path.join(DRIVE_ROOT, "logs")
 EXPORTED = os.path.join(DRIVE_ROOT, "exported")
-MANIFEST = os.path.join(DRIVE_ROOT, "models.yaml")
+MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models.yaml")
 PRETRAINED = os.path.join(APPLIO_DIR, "rvc/models/pretraineds/hifi-gan")
 
 _stop = threading.Event()
