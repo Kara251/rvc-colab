@@ -6,27 +6,28 @@
    the browser OAuth flow once.
 2. `python tools/gen_manifest.py` — scans `VoiceData/*/audios/jp_*/*.ogg`,
    writes `models.yaml`. Multi-speaker dirs (`Main`, `Tutorial`, `ST*`) are
-   excluded; edit the file to drop or retune models.
+   excluded; edit `models.yaml` to drop or retune models.
 3. `python tools/prepare_datasets.py` — writes `datasets/<Model>.zip`
    (flat ogg bundles, stored uncompressed).
 
 ## Running
 
-`python run_cloud.py` does everything:
+`python run_cloud.py` handles the whole queue:
 
-- creates (or reuses) session `rvc-train`, mounts Drive
-- uploads `worker.py` + manifest, spawns the worker detached
-- worker installs Applio (pinned commit) and downloads prerequisites; heavy
-  assets are cached to Drive so later sessions skip the download
-- per model: waits for its dataset zip (orchestrator uploads on demand),
-  preprocess -> extract -> train; checkpoints sync to Drive every 60 s
-- if the session dies (quota/idle), the loop recreates it and the worker
-  resumes from the newest Drive checkpoint; preprocess/extract are re-run
-  because their outputs are cheap and local-only
-- finished models export `*_e_*s.pth` + `*.index` to `Drive/RVC-Train/exported/`
+- creates/reuses session `rvc-train` (T4 by default, `--gpu` overrides)
+- uploads `worker.py` + config + model.json, pushes the local checkpoint
+  mirror back to the VM, uploads the dataset zip, spawns the worker detached
+- worker installs Applio (pinned commit) + prerequisites once per session,
+  then preprocess -> extract -> train; Applio resumes automatically from the
+  newest `G_*/D_*` checkpoint present in `logs/<model>/`
+- orchestrator polls status and pulls new checkpoint files to
+  `checkpoints/<model>/` every poll cycle, so progress survives VM death
+- on `trained`, the latest `*_e_*s.pth` + `*.index` are copied into
+  `RVC/<char>/<model>.pth|.index` (`_v2`, `_v3`... if the name is taken) and
+  the remote logs dir is wiped to keep the VM disk clean
 
-Interrupt with Ctrl-C; rerun the same command to continue. `--once` performs a
-single session attempt without the relaunch loop.
+Interrupt with Ctrl-C; rerun the same command to continue. `--model NAME`
+trains a single model, `--once` avoids the relaunch loop.
 
 ## Epochs
 
@@ -34,16 +35,15 @@ single session attempt without the relaunch loop.
 300, 1200)` — constant gradient steps (~25k) regardless of dataset size.
 Override per model in `models.yaml`.
 
-## Pulling results
-
-While a session is alive: `python tools/pull_models.py` copies each export into
-`RVC/<Char>/<Char>_JP.pth|.index`, suffixing `_v2`, `_v3`, ... when the name is
-taken.
-
 ## Notes / limits
 
-- Checkpoints are the only large artifacts synced to Drive; preprocess slices
-  and features are re-derived per session (minutes).
-- If a G_/D_ pair is corrupt (died mid-write), the worker deletes it and
+- Drive is NOT used: `colab drivemount` requires a fresh browser approval per
+  session, which would break unattended resume. All persistence goes through
+  `colab upload`/`download` over the session channel.
+- preprocess/extract outputs are re-derived per session (minutes); only
+  checkpoints, config.json and index files are mirrored.
+- If a G_/D_ pair is corrupt (VM died mid-write), the worker deletes it and
   resumes from the previous pair.
-- Failed models are logged in `status.json` and skipped; the queue continues.
+- Failed models are logged and skipped; the queue continues.
+- Dataset zips are uploaded on demand and deleted after unpacking; datasets
+  and per-model preprocess artifacts never persist off the VM.

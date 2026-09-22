@@ -30,6 +30,9 @@ if pid and _alive(pid):
     print(f"BOOTSTRAP::already_running pid={pid}")
 else:
     os.makedirs("/content/rvc_work", exist_ok=True)
+    # clear stale status so the orchestrator doesn't read a dead run's result
+    if os.path.exists(STATUS):
+        os.remove(STATUS)
     out = open("/content/rvc_work/worker.out", "a", buffering=1)
     p = subprocess.Popen(
         ["python", "/content/worker.py"],
