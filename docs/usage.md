@@ -2,48 +2,58 @@
 
 ## One-time setup
 
-1. `uv tool install google-colab-cli`, then run any `colab` command and finish
-   the browser OAuth flow once.
-2. `python tools/gen_manifest.py` — scans `VoiceData/*/audios/jp_*/*.ogg`,
+1. `python tools/gen_manifest.py` — scans `VoiceData/*/audios/jp_*/*.ogg`,
    writes `models.yaml`. Multi-speaker dirs (`Main`, `Tutorial`, `ST*`) are
    excluded; edit `models.yaml` to drop or retune models.
-3. `python tools/prepare_datasets.py` — writes `datasets/<Model>.zip`
+2. `python tools/prepare_datasets.py` — writes `datasets/<Model>.zip`
    (flat ogg bundles, stored uncompressed).
+3. On Google Drive create `RVC-Train/` and upload:
+   - `datasets/` — every zip from `AI-Models/datasets/` (~1.4 GB)
+   - `models.yaml`
+   - `worker.py`
 
 ## Running
 
-`python run_cloud.py` handles the whole queue:
+Upload `notebook/train.ipynb` in Colab (or open it from GitHub later), pick a
+T4 GPU runtime, run the single cell. It mounts Drive (browser approval, once
+per session) then runs `worker.py`, which:
 
-- creates/reuses session `rvc-train` (T4 by default, `--gpu` overrides)
-- uploads `worker.py` + config + model.json, pushes the local checkpoint
-  mirror back to the VM, uploads the dataset zip, spawns the worker detached
-- worker installs Applio (pinned commit) + prerequisites once per session,
-  then preprocess -> extract -> train; Applio resumes automatically from the
-  newest `G_*/D_*` checkpoint present in `logs/<model>/`
-- orchestrator polls status and pulls new checkpoint files to
-  `checkpoints/<model>/` every poll cycle, so progress survives VM death
-- on `trained`, the latest `*_e_*s.pth` + `*.index` are copied into
-  `RVC/<char>/<model>.pth|.index` (`_v2`, `_v3`... if the name is taken) and
-  the remote logs dir is wiped to keep the VM disk clean
+- installs Applio (pinned commit) + pretrained weights once per session
+- loops `models.yaml`: unzip dataset -> preprocess -> extract -> train
+- syncs `logs/<model>/` (checkpoints, config, index) to
+  `RVC-Train/logs/<model>/` every 60 s, so progress survives VM death
+- on completion copies weights + index to `RVC-Train/exported/<model>/` and
+  writes a `.trained` marker; done models are skipped on later runs
 
-Interrupt with Ctrl-C; rerun the same command to continue. `--model NAME`
-trains a single model, `--once` avoids the relaunch loop.
+Session dies -> reopen the notebook, run the cell again. The worker restores
+the newest Drive checkpoint and resumes; Applio picks up at the last saved
+epoch automatically. Preprocess/extract outputs are re-derived per session
+(minutes); only checkpoints and indexes persist on Drive.
+
+## Collecting finished models
+
+Download `RVC-Train/exported/` from Drive to local disk, then:
+
+```
+python tools/pull_models.py --src <path to exported>
+```
+
+copies each `<Model>.pth`/`.index` into `RVC/<char>/`, appending `_v2`, `_v3`…
+when the name is already taken. Existing files are never modified.
 
 ## Epochs
 
 `gen_manifest.py` sets `epochs = clamp(target_steps * batch_size / files,
-300, 1200)` — constant gradient steps (~25k) regardless of dataset size.
-Override per model in `models.yaml`.
+300, 1200)` — roughly constant gradient steps (~25k) regardless of dataset
+size. Override per model in `models.yaml` (`epochs`, `batch_size`,
+`sample_rate`, `save_every_epoch`, `f0_method`, `embedder_model`).
 
 ## Notes / limits
 
-- Drive is NOT used: `colab drivemount` requires a fresh browser approval per
-  session, which would break unattended resume. All persistence goes through
-  `colab upload`/`download` over the session channel.
-- preprocess/extract outputs are re-derived per session (minutes); only
-  checkpoints, config.json and index files are mirrored.
-- If a G_/D_ pair is corrupt (VM died mid-write), the worker deletes it and
-  resumes from the previous pair.
+- All state lives on Drive; your PC can be off between runs.
+- One Drive approval click per session is required by Colab itself.
+- A corrupt G_/D_ pair (VM died mid-write) is detected by Applio failing to
+  load; delete the newest pair in `RVC-Train/logs/<model>/` to roll back.
 - Failed models are logged and skipped; the queue continues.
-- Dataset zips are uploaded on demand and deleted after unpacking; datasets
-  and per-model preprocess artifacts never persist off the VM.
+- Dataset zips and preprocess artifacts stay on the VM and are deleted per
+  model after export to keep the session disk clean.

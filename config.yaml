@@ -1,16 +1,9 @@
-# Shared configuration for the rvc-colab pipeline.
+# Local paths and defaults for the dataset/manifest tools.
+# The Colab worker reads models.yaml on Drive; this file is local-only.
 
-# Pinned upstream training engine.
-applio_repo: https://github.com/IAHispano/Applio.git
-applio_commit: 55fe0b976a6990bb75261c32ccecf6bfca3198f1
+voice_data: F:/Dev/AI-Models/VoiceData
+datasets_dir: F:/Dev/AI-Models/datasets
 
-# Local paths.
-voice_data: F:\Dev\AI-Models\VoiceData
-datasets_dir: F:\Dev\AI-Models\datasets
-checkpoints_dir: F:\Dev\AI-Models\checkpoints
-rvc_models_dir: F:\Dev\AI-Models\RVC
-
-# Training defaults (per-model values in models.yaml override these).
 defaults:
   sample_rate: 48000
   batch_size: 8
@@ -18,16 +11,7 @@ defaults:
   f0_method: rmvpe
   embedder_model: japanese-hubert-base
   vocoder: HiFi-GAN
-  gpu: "0"
-  # epochs = clamp(round(target_steps * batch_size / n_files), min, max)
+  # epochs = clamp(target_steps * batch_size / files, min, max)
   target_steps: 25000
-  min_epochs: 300
-  max_epochs: 1200
-
-# Colab session.
-colab:
-  session_name: rvc-train
-  gpu: T4
-  poll_seconds: 120
-  # how often the big G_/D_ checkpoint pair is pulled (small files export at end)
-  ckpt_pull_seconds: 900
+  epochs_min: 300
+  epochs_max: 1200
