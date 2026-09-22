@@ -30,6 +30,8 @@ SYNC_SEC = 60
 DATASETS = os.path.join(DRIVE_ROOT, "datasets")
 LOGS_DRIVE = os.path.join(DRIVE_ROOT, "logs")
 EXPORTED = os.path.join(DRIVE_ROOT, "exported")
+CACHE = os.path.join(DRIVE_ROOT, "cache")          # pip wheels + pretrained models
+APPLIO_MODELS = os.path.join(APPLIO_DIR, "rvc/models")
 MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models.yaml")
 PRETRAINED = os.path.join(APPLIO_DIR, "rvc/models/pretraineds/hifi-gan")
 
@@ -47,15 +49,27 @@ def have_weights():
 
 
 def ensure_applio():
+    os.makedirs(CACHE, exist_ok=True)
+    # reuse downloaded pip wheels across sessions
+    os.environ["PIP_CACHE_DIR"] = os.path.join(CACHE, "pip")
+
     if not os.path.isdir(os.path.join(APPLIO_DIR, "rvc")):
         subprocess.run(["git", "clone", "--depth", "1", APPLIO_REPO, APPLIO_DIR], check=True)
         subprocess.run(["git", "fetch", "--depth", "1", "origin", APPLIO_REF], cwd=APPLIO_DIR, check=True)
         subprocess.run(["git", "checkout", APPLIO_REF], cwd=APPLIO_DIR, check=True)
+
+    # restore cached pretrained/embedder models before pip so 'have_weights' sees them
+    models_cache = os.path.join(CACHE, "applio_models")
+    if os.path.isdir(models_cache):
+        subprocess.run(["cp", "-rn", models_cache + "/.", APPLIO_MODELS], check=False)
+
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements.txt"],
                    cwd=APPLIO_DIR, check=True)
     if not have_weights():
         subprocess.run([sys.executable, "core.py", "prerequisites",
                         "--pretraineds-hifigan", "--models"], cwd=APPLIO_DIR, check=True)
+        subprocess.run(["mkdir", "-p", models_cache], check=False)
+        subprocess.run(["cp", "-rn", APPLIO_MODELS + "/.", models_cache], check=False)
 
 
 def max_epoch(logdir):
