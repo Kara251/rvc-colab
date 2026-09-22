@@ -40,6 +40,7 @@ _stop = threading.Event()
 
 def sh(args, **kw):
     kw.setdefault("cwd", APPLIO_DIR)
+    kw.setdefault("stderr", subprocess.STDOUT)  # merge so output isn't shown red
     print("+", " ".join(args), flush=True)
     return subprocess.run(args, **kw)
 
