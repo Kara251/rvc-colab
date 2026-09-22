@@ -236,9 +236,10 @@ def main():
                if not os.path.exists(os.path.join(LOGS_DRIVE, m["name"], ".trained"))]
 
     # RVC_PRIORITY="Name1,Name2" runs matching models first (substring match)
-    prio = [s.strip() for s in os.environ.get("RVC_PRIORITY", "").split(",") if s.strip()]
+    prio = [s.strip().lower() for s in os.environ.get("RVC_PRIORITY", "").split(",") if s.strip()]
     if prio:
-        pending.sort(key=lambda m: next((i for i, p in enumerate(prio) if p in m["name"]), len(prio)))
+        pending.sort(key=lambda m: next((i for i, p in enumerate(prio)
+                                         if p in m["name"].lower()), len(prio)))
         print(f"priority order: {[m['name'] for m in pending[:len(prio) + 2]]}...", flush=True)
 
     print(f"queue: {len(pending)}/{len(models)} models pending", flush=True)
