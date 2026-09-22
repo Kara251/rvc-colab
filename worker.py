@@ -103,9 +103,22 @@ def sync_down(model):
     return max_epoch(dst)
 
 
+def heartbeat(model, phase):
+    """Write progress to Drive status.json so it is visible without Colab."""
+    st = {"model": model, "phase": phase,
+          "epoch": max_epoch(os.path.join(APPLIO_DIR, "logs", model)),
+          "ts": int(time.time())}
+    try:
+        with open(os.path.join(DRIVE_ROOT, "status.json"), "w") as f:
+            json.dump(st, f)
+    except OSError:
+        pass
+
+
 def sync_loop(model):
     while not _stop.wait(SYNC_SEC):
         sync_up(model)
+        heartbeat(model, "train")
 
 
 def ensure_dataset(name):
@@ -141,6 +154,7 @@ def train_one(m):
 
     cur = sync_down(name)
     print(f"[{name}] resume at epoch {cur}/{target}", flush=True)
+    heartbeat(name, "preprocess")
 
     t = threading.Thread(target=sync_loop, args=(name,), daemon=True)
     t.start()
