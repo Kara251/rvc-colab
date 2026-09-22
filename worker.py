@@ -81,11 +81,13 @@ def sync_up(model):
         s, d = os.path.join(src, f), os.path.join(dst, f)
         if not os.path.isfile(s):
             continue
+        if time.time() - os.path.getmtime(s) < 20:
+            continue  # still being written; next tick picks it up
         if not os.path.exists(d) or os.path.getsize(d) != os.path.getsize(s):
             try:
                 shutil.copyfile(s, d)
             except OSError:
-                pass  # file still being written; next tick picks it up
+                pass
 
 
 def sync_down(model):
@@ -165,15 +167,24 @@ def train_one(m):
         _stop.clear()
         sync_up(name)
 
-    # export weights + index
+    # export: newest weight as <name>.pth, plus the index file
     wdir = os.path.join(APPLIO_DIR, "logs", name)
     outdir = os.path.join(EXPORTED, name)
     os.makedirs(outdir, exist_ok=True)
     ok = False
+    final_w = os.path.join(wdir, name + ".pth")
+    if not os.path.exists(final_w):
+        epoch_ws = [(int(mm.group(1)), f) for f in os.listdir(wdir)
+                    for mm in [re.match(re.escape(name) + r"_(\d+)e_\d+s\.pth$", f)]
+                    if mm]
+        if epoch_ws:
+            final_w = os.path.join(wdir, max(epoch_ws)[1])
+    if os.path.exists(final_w):
+        shutil.copyfile(final_w, os.path.join(outdir, name + ".pth"))
+        ok = True
     for f in os.listdir(wdir):
-        if f.endswith(".pth") and f.startswith(name) or f.startswith("added_"):
+        if f.startswith("added_") and f.endswith(".index"):
             shutil.copyfile(os.path.join(wdir, f), os.path.join(outdir, f))
-            ok = True
     if ok:
         open(done_flag, "w").write(str(target))
     print(f"[{name}] {'done' if ok else 'trained but no weights found'}", flush=True)
